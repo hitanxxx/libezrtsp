@@ -39,7 +39,7 @@ int ezcache_exit(int channel_id)
     return 0;
 }
 
-int ezcache_frm_add(int channel_id, char * data, int datan, int typ, unsigned long long ts, char nalu_fin)
+int ezcache_frm_add(int channel_id, unsigned char * data, int datan, int typ, unsigned long long ts, char nalu_fin)
 {
     if((channel_id < 0) || (channel_id > 1)) {
         err("channel_id [%d] not support\n", channel_id);

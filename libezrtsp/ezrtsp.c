@@ -9,7 +9,32 @@ static char g_gmtstr[128] = {0};
 static char  *g_arr_week[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 static char  *g_arr_month[] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
 
-void ezrtsp_req(ev_ctx_t * ctx, int fd, void * user_data, int op);
+static void ezrtsp_req(ev_ctx_t * ctx, int fd, void * user_data, int op);
+
+static char * ezrtsp_gmtstr()
+{
+    struct timeval tv;
+    time_t sec;
+
+    memset(&tv, 0, sizeof(struct timeval));
+    gettimeofday(&tv, NULL);
+    sec = tv.tv_sec;
+
+    struct tm gmt;
+    gmtime_r(&sec, &gmt);
+    memset(g_gmtstr, 0, sizeof(g_gmtstr));
+    sprintf((char*)g_gmtstr,
+        "%s, %02d %s %04d %02d:%02d:%02d GMT",
+        g_arr_week[gmt.tm_wday],
+        gmt.tm_mday,
+        g_arr_month[gmt.tm_mon],
+        gmt.tm_year+1900,
+        gmt.tm_hour,
+        gmt.tm_min,
+        gmt.tm_sec
+    );
+    return g_gmtstr;
+}
 
 void ezrtsp_rsp_send(ev_ctx_t * ctx, int fd, void * user_data, int op)
 {
@@ -45,31 +70,6 @@ void ezrtsp_rsp_send(ev_ctx_t * ctx, int fd, void * user_data, int op)
     return ev_opt(ctx, fd, (void*)c, ezrtsp_req, EV_R);
 }
 
-static char * ezrtsp_gmtstr()
-{
-    struct timeval tv;
-    time_t sec;
-
-    memset(&tv, 0, sizeof(struct timeval));
-    gettimeofday(&tv, NULL);
-    sec = tv.tv_sec;
-
-    struct tm gmt;
-    gmtime_r(&sec, &gmt);
-    memset(g_gmtstr, 0, sizeof(g_gmtstr));
-    sprintf((char*)g_gmtstr,
-        "%s, %02d %s %04d %02d:%02d:%02d GMT",
-        g_arr_week[gmt.tm_wday],
-        gmt.tm_mday,
-        g_arr_month[gmt.tm_mon],
-        gmt.tm_year+1900,
-        gmt.tm_hour,
-        gmt.tm_min,
-        gmt.tm_sec
-    );
-    return g_gmtstr;
-}
-
 static void ezrtsp_rsp_push(rtsp_con_t * c, const char * str, ...)
 {
     va_list argslist;
@@ -84,7 +84,7 @@ static void ezrtsp_rsp_push(rtsp_con_t * c, const char * str, ...)
     c->meta->last += strlen(buf);
 }
 
-int ezrtsp_options(rtsp_con_t   * c)
+static int ezrtsp_options(rtsp_con_t   * c)
 {
     ezrtsp_rsp_push(c, "RTSP/1.0 200 OK\r\n");
     ezrtsp_rsp_push(c, "CSeq: %d\r\n", c->icseq);
@@ -93,31 +93,31 @@ int ezrtsp_options(rtsp_con_t   * c)
     return 0;
 }
 
-int ezrtsp_describe_video_sdp(int chn, char * str)
+static int ezrtsp_describe_video_sdp(int chn, char * str)
 {
     char vpsb64[128] = {0}, spsb64[512] = {0}, ppsb64[128] = {0};
     sys_data_t * vps = NULL;
     sys_data_t * sps = NULL;
     sys_data_t * pps = NULL;
-    ezrtsp_cfg_video_get(chn, &vps, &sps, &pps);
+    ezrtsp_video_sequence_parament_set_get(chn, &vps, &sps, &pps);
 
-    if(ezrtsp_vcodec_typ() == VT_H264) { 
+    if(ezrtsp_video_codec_typ() == VT_H264) { 
         int level = (sps->data[1]<<16) | (sps->data[2]<<8)|sps->data[3];
-        sys_base64_encode(sps->data, sps->datan, spsb64, sizeof(spsb64));
-        sys_base64_encode(pps->data, pps->datan, ppsb64, sizeof(ppsb64));
+        sys_base64_encode((char*)sps->data, sps->datan, spsb64, sizeof(spsb64));
+        sys_base64_encode((char*)pps->data, pps->datan, ppsb64, sizeof(ppsb64));
         sprintf(str, "profile-level-id=%06X;sprop-parameter-sets=%s,%s", level, spsb64, ppsb64);
     } else {
-        sys_base64_encode(vps->data, vps->datan, vpsb64, sizeof(vpsb64));
-        sys_base64_encode(pps->data, pps->datan, ppsb64, sizeof(ppsb64));
-        sys_base64_encode(sps->data, sps->datan, spsb64, sizeof(spsb64));
+        sys_base64_encode((char*)vps->data, vps->datan, vpsb64, sizeof(vpsb64));
+        sys_base64_encode((char*)pps->data, pps->datan, ppsb64, sizeof(ppsb64));
+        sys_base64_encode((char*)sps->data, sps->datan, spsb64, sizeof(spsb64));
         sprintf(str, "sprop-vps=%s;sprop-sps=%s;sprop-pps=%s", vpsb64, spsb64, ppsb64);
     }
     return 0;
 }
 
-int ezrtsp_describe_audio_sdp(char * str)
+static int ezrtsp_describe_audio_sdp(char * str)
 {
-    if(ezrtsp_acodec_typ() == AT_AAC) {
+    if(ezrtsp_audio_codec_typ() == AT_AAC) {
         #if(0)  ///if have't adts header, mabey need this
         int aac_samplerate = 8000;
         unsigned short config = 0;
@@ -151,7 +151,7 @@ int ezrtsp_describe_audio_sdp(char * str)
         );
         #else
         char config[32] = {0};
-		unsigned char * adts_header = ezrtsp_cfg_audio_get();
+		unsigned char * adts_header = ezrtso_audio_aadadts_get();
         unsigned char profile = (adts_header[2]&0xc0)>>6;
         unsigned char freq = (adts_header[2]&0x3c)>>2;
         unsigned char channel = ((adts_header[2]&0x1)<<2)|((adts_header[3]&0xc0)>>6);
@@ -171,19 +171,19 @@ int ezrtsp_describe_audio_sdp(char * str)
         );
         #endif
     } else {
-        err("ezrtsp not support audio codec typ [%d]\n", ezrtsp_acodec_typ());
+        err("ezrtsp not support audio codec typ [%d]\n", ezrtsp_audio_codec_typ());
         return -1;
     }
     return 0;
 }
 
-int ezrtsp_describe(rtsp_con_t * c)
+static int ezrtsp_describe(rtsp_con_t * c)
 {
     char sdp[4096] = {0};
     int sdpn = 0;
 
     c->fvideoenb = 1;
-    c->faudioenb = 0;
+    c->faudioenb = ezrtsp_audio_enb();
 
     if(c->fvideoenb) {
         char sdp_video[1024] = {0};
@@ -201,15 +201,15 @@ int ezrtsp_describe(rtsp_con_t * c)
             "a=rtpmap:%d %s/90000\r\n"
             "a=fmtp:%d packetization-mode=1;%s\r\n"
             "a=control:track=0\r\n",
-            (ezrtsp_vcodec_typ() == VT_H264) ? 96 : 97,
-            (ezrtsp_vcodec_typ() == VT_H264) ? 96 : 97,
-            (ezrtsp_vcodec_typ() == VT_H264) ? "H264" : "H265",
-            (ezrtsp_vcodec_typ() == VT_H264) ? 96 : 97,
+            (ezrtsp_video_codec_typ() == VT_H264) ? 96 : 97,
+            (ezrtsp_video_codec_typ() == VT_H264) ? 96 : 97,
+            (ezrtsp_video_codec_typ() == VT_H264) ? "H264" : "H265",
+            (ezrtsp_video_codec_typ() == VT_H264) ? 96 : 97,
             sdp_video
         );
     }
     if(c->faudioenb) {
-        if(ezrtsp_acodec_typ() == AT_AAC) {
+        if(ezrtsp_audio_codec_typ() == AT_AAC) {
             char sdp_audio[1024] = {0};
             ezrtsp_describe_audio_sdp(sdp_audio);
             sdpn += snprintf(sdp + sdpn, sizeof(sdp) - sdpn - 1,
@@ -221,7 +221,7 @@ int ezrtsp_describe(rtsp_con_t * c)
                 "a=control:track=1\r\n",
                 sdp_audio
             );
-        } else if (ezrtsp_acodec_typ() == AT_G711A) {
+        } else if (ezrtsp_audio_codec_typ() == AT_G711A) {
             sdpn += snprintf(sdp + sdpn, sizeof(sdp) - sdpn - 1,
                 "m=audio 0 RTP/AVP 8\r\n"
                 "c=IN IP4 0.0.0.0\r\n"
@@ -241,7 +241,7 @@ int ezrtsp_describe(rtsp_con_t * c)
     return 0;
 }
 
-int ezrtsp_setup_udp_connection(int * fd, int localport, char * cli_ip, int cli_port)
+static int ezrtsp_setup_udp_connection(int * fd, int localport, char * cli_ip, int cli_port)
 {
     int ffd = 0;
 
@@ -278,7 +278,7 @@ int ezrtsp_setup_udp_connection(int * fd, int localport, char * cli_ip, int cli_
     return 0;
 }
 
-int ezrtsp_setup(rtsp_con_t *c)
+static int ezrtsp_setup(rtsp_con_t *c)
 {
     srand(time(NULL));
     if(strlen(c->session_str) < 1) sprintf(c->session_str, "%06d", rand() % 100000);    
@@ -316,7 +316,7 @@ int ezrtsp_setup(rtsp_con_t *c)
     return 0;
 }
 
-int ezrtsp_play(rtsp_con_t * c)
+static int ezrtsp_play(rtsp_con_t * c)
 {
     c->fplay = 1;
 
@@ -350,7 +350,7 @@ int ezrtsp_play(rtsp_con_t * c)
     return 0;
 }
 
-void ezrtsp_rsp(ev_ctx_t * ctx, int fd, void * user_data, int op)
+static void ezrtsp_rsp(ev_ctx_t * ctx, int fd, void * user_data, int op)
 {
     rtsp_con_t * c = (rtsp_con_t *)user_data;
     assert(c != NULL);
@@ -371,11 +371,11 @@ void ezrtsp_rsp(ev_ctx_t * ctx, int fd, void * user_data, int op)
     return ezrtsp_rsp_send(ctx, fd, c, EV_W);
 }
 
-void ezrtsp_req(ev_ctx_t * ctx, int fd, void * user_data, int op)
+
+static void ezrtsp_req(ev_ctx_t * ctx, int fd, void * user_data, int op)
 {
     rtsp_con_t * c = (rtsp_con_t*)user_data;
     char * p = NULL;
-
     assert(EV_R == op);
 
     while(!c->fcomplete) {
@@ -492,7 +492,7 @@ void ezrtsp_req(ev_ctx_t * ctx, int fd, void * user_data, int op)
     return ezrtsp_rsp(ctx, fd, c, EV_W);
 }
 
-void ezrtsp_accept(ev_ctx_t * ctx, int listen_fd, void * user_data, int op)
+static void ezrtsp_accept(ev_ctx_t * ctx, int listen_fd, void * user_data, int op)
 {
     int fd = 0;
     rtsp_con_t * c = NULL;
@@ -535,7 +535,7 @@ void ezrtsp_accept(ev_ctx_t * ctx, int listen_fd, void * user_data, int op)
     return;
 }
 
-void * ezrtsp_task(void * para)
+static void * ezrtsp_serv_task(void * para)
 {
     ev_ctx_t * ctx = NULL;
 
@@ -552,7 +552,7 @@ void * ezrtsp_task(void * para)
     return NULL;
 }
 
-int ezrtsp_start1()
+int ezrtsp_serv_start()
 {
     dbg("ezrtsp listen on [%s:%d]\n", "0.0.0.0", EZRTSP_PORT);
     struct sockaddr_in addr;
@@ -582,7 +582,7 @@ int ezrtsp_start1()
     }
     
     rtsp_stat |= EZRTSP_INIT;
-    if(0 != pthread_create(&rtsp_pid, NULL, &ezrtsp_task, NULL)) {
+    if(0 != pthread_create(&rtsp_pid, NULL, &ezrtsp_serv_task, NULL)) {
         err("ezrtsp rtsptask create err. [%d]\n", errno);
         return -1;
     }
@@ -591,7 +591,7 @@ int ezrtsp_start1()
     return 0;
 }
 
-int ezrtsp_stop()
+int ezrtsp_serv_stop()
 {
 	if(rtsp_stat == 1) {
         rtsp_stat = 0;

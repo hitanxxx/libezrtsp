@@ -27,7 +27,7 @@ int ezrtp_packet_send(int fd, char * data, int datan)
     return 0;
 }
 
-int ezrtp_packet_build(rtsp_session_t * session, int payload, const char * data, int datan, int marker)
+static int ezrtp_packet_build(rtsp_session_t * session, int payload, const unsigned char * data, int datan, int marker)
 {
     char rtp_packet[EZRTSP_MSS] = {0};
     int offset = 0;
@@ -76,10 +76,10 @@ int ezrtp_packet_build(rtsp_session_t * session, int payload, const char * data,
     return 0;
 }
 
-int ezrtp_fu_265(rtsp_session_t * session, int payload, char * nal, int naln, int mark)
+static int ezrtp_fu_265(rtsp_session_t * session, int payload, unsigned char * nal, int naln, int mark)
 {
-    char * fua = NULL;
-    char pkt[EZRTSP_MSS] = {0};
+    unsigned char * fua = NULL;
+    unsigned char pkt[EZRTSP_MSS] = {0};
     int pktn = 0;
     int ret = -1;
 
@@ -144,7 +144,7 @@ int ezrtp_fu_265(rtsp_session_t * session, int payload, char * nal, int naln, in
     return ezrtp_packet_build(session, payload, pkt, (naln+3), 1);
 }
 
-int ezrtp_fu_264(rtsp_session_t * session, int payload, char * nal, int naln, int mark)
+static int ezrtp_fu_264(rtsp_session_t * session, int payload, unsigned char * nal, int naln, int mark)
 {
     /*  FU-A type
          0                   1                   2                   3
@@ -175,8 +175,8 @@ int ezrtp_fu_264(rtsp_session_t * session, int payload, char * nal, int naln, in
     */
 
     int ret = 0;
-    char * fua = NULL;
-    char pkt[EZRTSP_MSS] = {0};
+    unsigned char * fua = NULL;
+    unsigned char pkt[EZRTSP_MSS] = {0};
     int pktn = 0;
 
     pkt[0] = (nal[0]&0b11100000) | 28;    /// FU indicator
@@ -208,7 +208,7 @@ int ezrtp_fu_264(rtsp_session_t * session, int payload, char * nal, int naln, in
     return ezrtp_packet_build(session, payload, pkt, (naln+2), 1);
 }
 
-int ezrtp_send_vnalu(rtsp_session_t * session, char * frame, int framen, char nalu_fin)
+static int ezrtp_send_vnalu(rtsp_session_t * session, unsigned char * data, int datan, char nalu_fin)
 {
     int ret = 0;
    
@@ -216,45 +216,41 @@ int ezrtp_send_vnalu(rtsp_session_t * session, char * frame, int framen, char na
     mss -= 12;
     if(session->c->fovertcp) mss -= 4;
     
-    if(framen <= mss) {
-        if(ezrtsp_vcodec_typ() == VT_H264) {
-            ret = ezrtp_packet_build(session, 96, (char*)frame, framen, nalu_fin);
-        } else {
-            ret = ezrtp_packet_build(session, 97, (char*)frame, framen, nalu_fin);
-        }
+    if(datan <= mss) {
+        ret = ezrtp_packet_build(session, ezrtsp_video_codec_typ() == VT_H264 ? 96 : 97, data, datan, nalu_fin);
     } else {
-        if(ezrtsp_vcodec_typ() == VT_H264) {
-            ret = ezrtp_fu_264(session, 96, (char*)frame, framen, nalu_fin);
+        if(ezrtsp_video_codec_typ() == VT_H264) {
+            ret = ezrtp_fu_264(session, 96, data, datan, nalu_fin);
         } else {
-            ret = ezrtp_fu_265(session, 97, (char*)frame, framen, nalu_fin);
+            ret = ezrtp_fu_265(session, 97, data, datan, nalu_fin);
         }
     }  
     return ret;
 }
 
-int ezrtp_send_analu(rtsp_session_t * session, char * frame, int framen)
+static int ezrtp_send_analu(rtsp_session_t * session, unsigned char * data, int datan)
 {
-    const char * aac = NULL;
-    char pkt[EZRTSP_MSS] = {0};
+    const unsigned char * aac = NULL;
+    unsigned char pkt[EZRTSP_MSS] = {0};
     int pktn = 0;
     int ret = -1;
 
-    if(ezrtsp_acodec_typ() == AT_AAC) {
+    if(ezrtsp_audio_codec_typ() == AT_AAC) {
         ///skip ADTS header
-        framen -= 7;
+        datan -= 7;
         pkt[0] = 0x0;
         pkt[1] = 0x10;
-        pkt[2] = (framen & 0x1fe0) >> 5;
-        pkt[3] = (framen & 0x1f) << 3;
+        pkt[2] = (datan & 0x1fe0) >> 5;
+        pkt[3] = (datan & 0x1f) << 3;
         ///skip nalu header
-        aac = frame + 7;
+        aac = data + 7;
 
         int mss = EZRTSP_MSS;
         mss -= 12;
         if(session->c->fovertcp) mss -= 4;
         mss -= 4;
 
-        while(framen > mss) {
+        while(datan > mss) {
             pktn = mss;
             memcpy(&pkt[4], aac, pktn);
             ret = ezrtp_packet_build(session, 98, pkt, pktn+4, 0);
@@ -262,34 +258,34 @@ int ezrtp_send_analu(rtsp_session_t * session, char * frame, int framen)
                 break;
             }
             aac += pktn;
-            framen -= pktn;
+            datan -= pktn;
         }
-        memcpy(&pkt[4], aac, framen);
-        return ezrtp_packet_build(session, 98, pkt, framen+4, 1);
-    } else if(ezrtsp_acodec_typ() == AT_G711A) {
+        memcpy(&pkt[4], aac, datan);
+        return ezrtp_packet_build(session, 98, pkt, datan+4, 1);
+    } else if(ezrtsp_audio_codec_typ() == AT_G711A) {
    
         int mss = EZRTSP_MSS;
         mss -= 12;
         if(session->c->fovertcp) mss -= 4;
         mss -= 4;
 
-        while(framen > mss) {
+        while(datan > mss) {
             pktn = mss;
 
-            ret = ezrtp_packet_build(session, 8, frame, pktn, 0);
+            ret = ezrtp_packet_build(session, 8, data, pktn, 0);
             if(ret < 0) 
                 break;
 
-            frame += pktn;
-            framen -= pktn;
+            data += pktn;
+            datan -= pktn;
         }
-        return ezrtp_packet_build(session, 8, frame, framen, 1);
+        return ezrtp_packet_build(session, 8, data, datan, 1);
     }
-    err("ezrtsp not support audio codec typ [%d]\n", ezrtsp_acodec_typ());
+    err("ezrtsp not support audio codec typ [%d]\n", ezrtsp_audio_codec_typ());
     return -1;
 }
 
-static int ezrtp_send_audio(rtsp_con_t * c, char * data, int datan)
+static int ezrtp_send_audio(rtsp_con_t * c, unsigned char * data, int datan)
 {
     if(!c->faudioenb) return 0;
     rtsp_session_t * ses = &c->session_audio;
@@ -310,7 +306,7 @@ static int ezrtp_send_audio(rtsp_con_t * c, char * data, int datan)
     return 0;
 }
 
-static int ezrtp_send_video(rtsp_con_t * c, char * data, int datan, int idr, char nalu_fin)
+static int ezrtp_send_video(rtsp_con_t * c, unsigned char * data, int datan, int idr, char nalu_fin)
 {
     if(!c->fvideoenb) return 0;
     rtsp_session_t * ses = &c->session_video;
@@ -331,7 +327,7 @@ static int ezrtp_send_video(rtsp_con_t * c, char * data, int datan, int idr, cha
     return 0;
 }
 
-void * ezrtp_task(void * param)
+static void * ezrtp_task(void * param)
 {
     SET_THREAD_NAME("hm2p_ezrtp");
     rtsp_con_t * c = (rtsp_con_t *) param;

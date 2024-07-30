@@ -20,12 +20,12 @@ typedef struct ezcache_frm_s
     char                typ;    // 0:audio  1:iframe  2:pframe
     char                nalu_fin;
     int                 datan;
-    char                data[0];
+    unsigned char       data[0];
 } ezcache_frm_t;
 
 
 int ezcache_exit(int channel_id);
-int ezcache_frm_add(int channel_id, char * data, int datan, int typ, unsigned long long ts, char nalu_fin);
+int ezcache_frm_add(int channel_id, unsigned char * data, int datan, int typ, unsigned long long ts, char nalu_fin);
 ezcache_frm_t * ezcache_frm_get(int channel_id, long long seq);
 long long ezcache_idr_last(int channel_id);
 long long ezcache_idr_prev(int channel_id, long long seq);

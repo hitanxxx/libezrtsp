@@ -144,7 +144,7 @@ struct meta_t {
 
 typedef struct sys_data {
 	int datan;
-	char data[0];
+	unsigned char data[0];
 } sys_data_t;
 
 #define meta_getfree(x) ((x)->end - (x)->last)

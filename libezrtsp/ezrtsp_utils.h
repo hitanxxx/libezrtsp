@@ -10,7 +10,6 @@
 #define EZRTSP_URI_MAIN      "/main_ch"
 #define EZRTSP_URI_SUB	     "/sub_ch"
 
-
 typedef struct {
     int vtype;  ///VT_H264/VT_H265
     int aenb;
@@ -19,7 +18,7 @@ typedef struct {
 
 int ezrtsp_start(ezrtsp_ctx_t * ctx);
 int ezrtsp_stop();
-int ezrtsp_push_afrm(char * data, int datan);
-int ezrtsp_push_vfrm(int ch, char * data, int datan);
+int ezrtsp_push_afrm(unsigned char * data, int datan);
+int ezrtsp_push_vfrm(int ch, unsigned char * data, int datan);
 
 #endif

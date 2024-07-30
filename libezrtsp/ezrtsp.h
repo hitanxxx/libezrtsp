@@ -102,32 +102,26 @@ struct rtsp_con {
     int rtp_stat;
 };
 
+int ezrtsp_serv_start();
+int ezrtsp_serv_stop();
 
 int ezrtsp_con_init();
 int ezrtsp_con_alloc(rtsp_con_t ** c);
 void ezrtsp_con_free(rtsp_con_t * c);
 void ezrtsp_con_expire(ev_ctx_t * ctx, int fd, void * user_data);
 
-
-int ezrtcp_sr_send(rtsp_con_t *c);
 int ezrtp_start(rtsp_con_t * c);
-
-
-int ezrtsp_start1();
-int ezrtp_send_audio_frame(rtsp_session_t * session, char * frame, int framen);
-int ezrtp_send_video_frame(rtsp_session_t * session, char * frame, int framen, char nalu_fin);
 int ezrtp_packet_send(int fd, char * data, int datan);
+int ezrtcp_sr_send(rtsp_con_t *c);
 
+int ezrtsp_video_codec_typ();
+int ezrtsp_video_sequence_parament_set_ready(int ch);
+int ezrtsp_video_sequence_parament_set_get(int ch, sys_data_t ** vps, sys_data_t ** sps, sys_data_t ** pps);
 
-int ezrtsp_acodec_typ();
-int ezrtsp_vcodec_typ();
+int ezrtsp_audio_codec_typ();
+int ezrtsp_audio_enb();
+int ezrtsp_audio_aacadts_ready();
+unsigned char * ezrtso_audio_aadadts_get();
 
-int ezrtsp_cfg_video_ready(int ch);
-int ezrtsp_cfg_video_get(int ch, sys_data_t ** vps, sys_data_t ** sps, sys_data_t ** pps);
-int ezrtsp_cfg_video_set(int ch, char * data, int datan);
-
-int ezrtsp_cfg_audio_ready();
-unsigned char * ezrtsp_cfg_audio_get();
-int ezrtsp_cfg_audio_set(unsigned char * data, int datan);
 
 #endif

@@ -1,9 +1,9 @@
-#include "common.h"
+#include "ezrtsp_common.h"
 #include "ezcache.h"
 
 #define CACHE_SIZE_MAX  (2*1024*1024)    ///max cache size of each channel
 
-static queue_t g_cache_frm_queue[2];
+static ezrtsp_queue_t g_cache_frm_queue[2];
 static int g_cache_frm_init[2] = {0};
 static int g_cache_frm_cnt[2] = {0};
 static int g_cache_frm_totaln[2] = {0};
@@ -21,7 +21,7 @@ int ezcache_init(int channel_id)
         err("channel_id [%d] cc already init\n", channel_id);
         return -1;
     }
-    queue_init(&g_cache_frm_queue[channel_id]);
+    ezrtsp_queue_init(&g_cache_frm_queue[channel_id]);
     return 0;
 }
 
@@ -36,6 +36,20 @@ int ezcache_exit(int channel_id)
         return -1;
     }
     ///todo: run loop and clear each channel
+    int ch = 0;
+    for(ch = 0; ch < 2; ch++) {
+        ezrtsp_queue_t * s = NULL;
+        ezrtsp_queue_t * q = ezrtsp_queue_head(&g_cache_frm_queue[ch]);
+        while(q != ezrtsp_queue_tail(&g_cache_frm_queue[ch])) {
+            s = ezrtsp_queue_next(q);
+            ezcache_frm_t * frm = ptr_get_struct(q, ezcache_frm_t, queue);
+            ezrtsp_free(frm);
+            q = s;
+        }
+        g_cache_frm_cnt[ch] = 0;
+        g_cache_frm_totaln[ch] = 0;
+        g_cache_frm_seq[ch] = 0;
+    }
     return 0;
 }
 
@@ -59,23 +73,23 @@ int ezcache_frm_add(int channel_id, unsigned char * data, int datan, int typ, un
     }
     pthread_mutex_lock(&g_cache_frm_lock);
     while(g_cache_frm_totaln[channel_id] >= CACHE_SIZE_MAX) { ///del oldest
-        queue_t * q = queue_head(&g_cache_frm_queue[channel_id]);
+        ezrtsp_queue_t * q = ezrtsp_queue_head(&g_cache_frm_queue[channel_id]);
         ezcache_frm_t * oldest_frm = ptr_get_struct(q, ezcache_frm_t, queue);
-        queue_remove(q);
+        ezrtsp_queue_remove(q);
         int freen = oldest_frm->datan;
-        sys_free(oldest_frm);
+        ezrtsp_free(oldest_frm);
         
         g_cache_frm_totaln[channel_id] -= freen;
         g_cache_frm_cnt[channel_id] --;
     }
 
-    ezcache_frm_t * new_frm = sys_alloc(sizeof(ezcache_frm_t) + datan);
+    ezcache_frm_t * new_frm = ezrtsp_alloc(sizeof(ezcache_frm_t) + datan);
     if(!new_frm) {
         err("alloc frmn [%ld] failed. [%d]\n", sizeof(ezcache_frm_t) + datan, errno);
         pthread_mutex_unlock(&g_cache_frm_lock);
         return -1;
     }
-    queue_insert_tail(&g_cache_frm_queue[channel_id], &new_frm->queue);
+    ezrtsp_queue_insert_tail(&g_cache_frm_queue[channel_id], &new_frm->queue);
     memcpy(new_frm->data, data, datan);
     new_frm->datan = datan;
     new_frm->seq = g_cache_frm_seq[channel_id]++;
@@ -107,8 +121,8 @@ ezcache_frm_t * ezcache_frm_get(int channel_id, long long seq)
         
     pthread_mutex_lock(&g_cache_frm_lock);
     if((seq * 2) <= g_cache_frm_seq[channel_id]) {  ///head start 
-        queue_t * q = queue_head(&g_cache_frm_queue[channel_id]);
-        for(; q != queue_tail(&g_cache_frm_queue[channel_id]); q = queue_next(q)) {
+        ezrtsp_queue_t * q = ezrtsp_queue_head(&g_cache_frm_queue[channel_id]);
+        for(; q != ezrtsp_queue_tail(&g_cache_frm_queue[channel_id]); q = ezrtsp_queue_next(q)) {
             frm = ptr_get_struct(q, ezcache_frm_t, queue);
             if(frm->seq == seq) {
                 find = 1;
@@ -116,8 +130,8 @@ ezcache_frm_t * ezcache_frm_get(int channel_id, long long seq)
             }
         }
     } else { ///tail start
-        queue_t * q = queue_prev(&g_cache_frm_queue[channel_id]);
-        for(; q != queue_tail(&g_cache_frm_queue[channel_id]); q = queue_prev(q)) {
+        ezrtsp_queue_t * q = ezrtsp_queue_prev(&g_cache_frm_queue[channel_id]);
+        for(; q != ezrtsp_queue_tail(&g_cache_frm_queue[channel_id]); q = ezrtsp_queue_prev(q)) {
             frm = ptr_get_struct(q, ezcache_frm_t, queue);
             if(frm->seq == seq) {
                 find = 1;
@@ -126,7 +140,7 @@ ezcache_frm_t * ezcache_frm_get(int channel_id, long long seq)
         }
     }
     if(find) {
-        ezcache_frm_t * new_frm = sys_alloc(sizeof(ezcache_frm_t) + frm->datan);
+        ezcache_frm_t * new_frm = ezrtsp_alloc(sizeof(ezcache_frm_t) + frm->datan);
         if(new_frm) {
             memcpy(new_frm, frm, sizeof(ezcache_frm_t) + frm->datan);
             pthread_mutex_unlock(&g_cache_frm_lock);
@@ -153,12 +167,12 @@ long long ezcache_idr_prev(int channel_id, long long seq)
         return -1;
     }
 
-    queue_t * q = queue_head(&g_cache_frm_queue[channel_id]);
-    for(; q != queue_tail(&g_cache_frm_queue[channel_id]); q = queue_next(q)) {
+    ezrtsp_queue_t * q = ezrtsp_queue_head(&g_cache_frm_queue[channel_id]);
+    for(; q != ezrtsp_queue_tail(&g_cache_frm_queue[channel_id]); q = ezrtsp_queue_next(q)) {
         ezcache_frm_t * frm = ptr_get_struct(q, ezcache_frm_t, queue);
         if(frm->seq == seq) {
-            queue_t * t = queue_prev(q); ///forward traserval find previously idr frame
-            for(; t != queue_tail(&g_cache_frm_queue[channel_id]); t = queue_prev(t)) {
+            ezrtsp_queue_t * t = ezrtsp_queue_prev(q); ///forward traserval find previously idr frame
+            for(; t != ezrtsp_queue_tail(&g_cache_frm_queue[channel_id]); t = ezrtsp_queue_prev(t)) {
                 ezcache_frm_t * frmm = ptr_get_struct(t, ezcache_frm_t, queue);
                 if(frmm->typ == 1) {
                     return frmm->seq;
@@ -184,12 +198,12 @@ long long ezcache_idr_next(int channel_id, long long seq)
         return -1;
     }
 
-    queue_t * q = NULL;
-    for(q = queue_head(&g_cache_frm_queue[channel_id]); q != queue_tail(&g_cache_frm_queue[channel_id]); q = queue_next(q)) {
+    ezrtsp_queue_t * q = NULL;
+    for(q = ezrtsp_queue_head(&g_cache_frm_queue[channel_id]); q != ezrtsp_queue_tail(&g_cache_frm_queue[channel_id]); q = ezrtsp_queue_next(q)) {
         ezcache_frm_t * frm = ptr_get_struct(q, ezcache_frm_t, queue);
         if(frm->seq == seq) {
-            q = queue_next(&frm->queue);
-            while(q != queue_tail(&g_cache_frm_queue[channel_id])) {
+            q = ezrtsp_queue_next(&frm->queue);
+            while(q != ezrtsp_queue_tail(&g_cache_frm_queue[channel_id])) {
                 frm = ptr_get_struct(q, ezcache_frm_t, queue);
                 if(frm->typ == 1) {
                     return frm->seq;
@@ -212,8 +226,8 @@ long long ezcache_idr_last(int channel_id)
     if(!g_cache_frm_init[channel_id])
         return -1;
     
-    queue_t * q = queue_prev(&g_cache_frm_queue[channel_id]);
-    for(; q != queue_tail(&g_cache_frm_queue[channel_id]); q = queue_prev(q)) {
+    ezrtsp_queue_t * q = ezrtsp_queue_prev(&g_cache_frm_queue[channel_id]);
+    for(; q != ezrtsp_queue_tail(&g_cache_frm_queue[channel_id]); q = ezrtsp_queue_prev(q)) {
         ezcache_frm_t * frm = ptr_get_struct(q, ezcache_frm_t, queue);
         if(frm->typ == 1) {
             return frm->seq;

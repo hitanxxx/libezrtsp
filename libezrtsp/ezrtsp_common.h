@@ -1,5 +1,5 @@
-#ifndef __COMMON_H__
-#define __COMMON_H__
+#ifndef __EZRTSP_COMMON_H__
+#define __EZRTSP_COMMON_H__
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -45,7 +45,6 @@
 #include <pthread.h>
 #include <sys/socket.h>
 
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
@@ -62,61 +61,75 @@
 #include <netdb.h>
 #include <assert.h>
 
-typedef enum {
-	AT_PCM = 0,
-	AT_G711A,	
-	AT_G711U,	
-	AT_AAC,		
-	AT_MP3,		
-	AT_OPUS,     
-	AT_MAX		
-} audio_codec_typ;
 
-typedef enum {
-    VT_H264 = 0,
-    VT_H265,
-} video_codec_typ;
-
-// hm2p base64 use
 /* This uses that the expression (n+(k-1))/k means the smallest
    integer >= n/k, i.e., the ceiling of n/k.  */
-#define HM2P_BASE64_LENGTH(inlen) ((((inlen) + 2) / 3) * 4)
+#ifndef EZRTSP_BASE64_LENGTH
+#define EZRTSP_BASE64_LENGTH(inlen) ((((inlen) + 2) / 3) * 4)
+#endif
 
+#ifndef sys_msleep
 #define sys_msleep(msec) (usleep(1000*msec))
+#endif
 
 /// improve compile performance
+#ifndef LIKELY
 #define LIKELY(x)       __builtin_expect(!!(x), 1)
-#define UNLIKELY(x)     __builtin_expect(!!(x), 0)
+#endif
 
+#ifndef UNLIKELY
+#define UNLIKELY(x)     __builtin_expect(!!(x), 0)
+#endif
+
+#ifndef err
 #define err(format, ...) \
 do { \
     printf("[ERROR] %lu (%s)%s:%d "format, time(NULL), __FILE__, __func__, __LINE__, ##__VA_ARGS__);\
 } while(0);
+#endif
 
+#ifndef dbg
 #define dbg(format, ...) \
 do { \
     printf("[DEBUG] %lu (%s)%s:%d "format, time(NULL), __FILE__, __func__, __LINE__, ##__VA_ARGS__);\
 } while(0);
+#endif
 
+#ifndef EZRTSP_THNAME
+#define EZRTSP_THNAME(name) (prctl(PR_SET_NAME, (unsigned long)name))
+#endif
 
-
-#define SET_THREAD_NAME(name) (prctl(PR_SET_NAME, (unsigned long)name))
-
+#ifndef IN
 #define IN
+#endif
+
+#ifndef OUT
 #define OUT
+#endif
 
+#ifndef SYS_ABS
 #define SYS_ABS(a) ( ((a)>=0)?(a):(0-(a)) )
-#define SYS_MAX(a,b) ((a)>(b)?(a):(b))
-#define SYS_MIN(a,b) ((a)>(b)?(b):(a))
-#define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
+#endif
 
+#ifndef SYS_MAX
+#define SYS_MAX(a,b) ((a)>(b)?(a):(b))
+#endif
+
+#ifndef SYS_MIN
+#define SYS_MIN(a,b) ((a)>(b)?(b):(a))
+#endif
+
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x)/sizeof((x)[0]))
+#endif
+
+#ifndef ptr_get_struct
 #define ptr_get_struct( ptr, struct_type, struct_member ) \
 (\
     (struct_type *)\
     (((unsigned char*)ptr)-offsetof(struct_type,struct_member))\
 )
-
-
+#endif
 
 /// macro append after struct data for align with 1 Byte
 #ifndef __packed
@@ -124,17 +137,15 @@ do { \
 #endif
 
 
-
-typedef struct queue_s queue_t;
-struct queue_s
-{
-    queue_t  *prev;
-    queue_t  *next;
+typedef struct queue_s ezrtsp_queue_t;
+struct queue_s {
+    ezrtsp_queue_t  *prev;
+    ezrtsp_queue_t  *next;
 };
 
-typedef struct meta_t meta_t;
-struct meta_t {
-	meta_t * next;
+typedef struct ezrtsp_meta_t ezrtsp_meta_t;
+struct ezrtsp_meta_t {
+	ezrtsp_meta_t * next;
 	char * start;
 	char * end;
 	char * pos;
@@ -142,39 +153,50 @@ struct meta_t {
 	char data[0];
 };
 
-typedef struct sys_data {
+typedef struct ezrtsp_data {
 	int datan;
 	unsigned char data[0];
-} sys_data_t;
+} ezrtsp_data_t;
 
+#ifndef meta_getfree
 #define meta_getfree(x) ((x)->end - (x)->last)
+#endif
+
+#ifndef meta_getlen
 #define meta_getlen(x) ((x)->last - (x)->pos)
+#endif
+
+#ifndef meta_cap
 #define meta_cap(x) ((x)->end - (x)->start)
+#endif
+
+#ifndef meta_clr
 #define meta_clr(x) \
 do { \
 	(x)->pos = (x)->last = (x)->start; \
 	memset(x->start, 0x0, meta_cap(x)); \
 } while(0); 
+#endif
 
-int sys_base64_encode(const char *in, int inlen, char *out, int outlen);
-int sys_base64_decode(const char *in, int inlen, char *out, int outlen);
+int ezrtsp_base64_encode(const char *in, int inlen, char *out, int outlen);
+int ezrtsp_base64_decode(const char *in, int inlen, char *out, int outlen);
 
 // common function
-void sys_free(void * addr);
-void * sys_alloc(int size);
-unsigned long long sys_ts_msec(void);
+void ezrtsp_free(void * addr);
+void * ezrtsp_alloc(int size);
+unsigned long long ezrtsp_ts_msec(void);
 
-void queue_init(queue_t * q);
-void queue_insert(queue_t * h, queue_t * q);
-void queue_insert_tail(queue_t * h, queue_t * q);
-void queue_remove(queue_t * q);
-int queue_empty(queue_t * h);
-queue_t * queue_head(queue_t * h);
-queue_t * queue_next(queue_t * q);
-queue_t * queue_prev(queue_t * q);
-queue_t * queue_tail(queue_t * h);
+void ezrtsp_queue_init(ezrtsp_queue_t * q);
+void ezrtsp_queue_insert(ezrtsp_queue_t * h, ezrtsp_queue_t * q);
+void ezrtsp_queue_insert_tail(ezrtsp_queue_t * h, ezrtsp_queue_t * q);
+void ezrtsp_queue_remove(ezrtsp_queue_t * q);
+int ezrtsp_queue_empty(ezrtsp_queue_t * h);
+ezrtsp_queue_t * ezrtsp_queue_head(ezrtsp_queue_t * h);
+ezrtsp_queue_t * ezrtsp_queue_next(ezrtsp_queue_t * q);
+ezrtsp_queue_t * ezrtsp_queue_prev(ezrtsp_queue_t * q);
+ezrtsp_queue_t * ezrtsp_queue_tail(ezrtsp_queue_t * h);
 
-int meta_alloc(meta_t ** meta, int size);
-void meta_free(meta_t * meta);
+int ezrtsp_meta_alloc(ezrtsp_meta_t ** meta, int size);
+void ezrtsp_meta_free(ezrtsp_meta_t * meta);
 
 #endif

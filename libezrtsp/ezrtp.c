@@ -290,7 +290,7 @@ static int ezrtp_send_audio(rtsp_con_t * c, unsigned char * data, int datan)
     if(!c->faudioenb) return 0;
     rtsp_session_t * ses = &c->session_audio;
 
-    unsigned long long ts_now = sys_ts_msec();
+    unsigned long long ts_now = ezrtsp_ts_msec();
     if(ses->ts_prev > 0) ses->ts += (ts_now - ses->ts_prev) * 8;
     ses->ts_prev = ts_now;
 
@@ -311,7 +311,7 @@ static int ezrtp_send_video(rtsp_con_t * c, unsigned char * data, int datan, int
     if(!c->fvideoenb) return 0;
     rtsp_session_t * ses = &c->session_video;
 
-    unsigned long long ts_now = sys_ts_msec();
+    unsigned long long ts_now = ezrtsp_ts_msec();
     if(ses->ts_prev > 0) ses->ts += (ts_now - ses->ts_prev) * 90;
     ses->ts_prev = ts_now;
 
@@ -329,7 +329,7 @@ static int ezrtp_send_video(rtsp_con_t * c, unsigned char * data, int datan, int
 
 static void * ezrtp_task(void * param)
 {
-    SET_THREAD_NAME("hm2p_ezrtp");
+    EZRTSP_THNAME("hm2p_ezrtp");
     rtsp_con_t * c = (rtsp_con_t *) param;
     unsigned long long ts_rtcp_sr = 0;
     int nfrmn = 0;
@@ -357,7 +357,7 @@ static void * ezrtp_task(void * param)
                     break;
                 }
             }
-            sys_free(frm);
+            ezrtsp_free(frm);
         } else {
             nfrmn++;
             if(nfrmn > 5) {
@@ -366,7 +366,7 @@ static void * ezrtp_task(void * param)
             }
         }
 
-        unsigned long long ts_now = sys_ts_msec();
+        unsigned long long ts_now = ezrtsp_ts_msec();
         if(ts_now - ts_rtcp_sr >= 5000) {
             ezrtcp_sr_send(c);
             ts_rtcp_sr = ts_now;

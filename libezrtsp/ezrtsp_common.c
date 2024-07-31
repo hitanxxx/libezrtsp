@@ -1,4 +1,4 @@
-#include "common.h"
+#include "ezrtsp_common.h"
 
 #if defined(FAC)
 void *__stack_chk_guard = (void *)0xdeadbeef;
@@ -19,7 +19,7 @@ static const char b64dec[128] = {
 
 static pthread_mutex_t g_alloc_lock = PTHREAD_MUTEX_INITIALIZER;
 
-int sys_base64_encode(const char *in, int inlen, char *out, int outlen)
+int ezrtsp_base64_encode(const char *in, int inlen, char *out, int outlen)
 {
 	int pad = 0;
 	int i = 0, j = 0;
@@ -66,7 +66,7 @@ int sys_base64_encode(const char *in, int inlen, char *out, int outlen)
 	return j;
 }
 
-int sys_base64_decode(const char *in, int inlen, char *out, int outlen)
+int ezrtsp_base64_decode(const char *in, int inlen, char *out, int outlen)
 {
 	int i = 0, j = 0, pad = 0;
 	unsigned char c[4] = {0};
@@ -115,13 +115,13 @@ int sys_base64_decode(const char *in, int inlen, char *out, int outlen)
 }
 
 
-void queue_init( queue_t * q )
+void ezrtsp_queue_init(ezrtsp_queue_t * q)
 {
 	q->prev = q;
 	q->next = q;
 }
 
-void queue_insert( queue_t * h, queue_t * q )
+void ezrtsp_queue_insert(ezrtsp_queue_t * h, ezrtsp_queue_t * q)
 {
 	q->next = h->next;
 	q->prev = h;
@@ -130,9 +130,9 @@ void queue_insert( queue_t * h, queue_t * q )
 	h->next = q;
 }
 
-void queue_insert_tail( queue_t * h, queue_t * q )
+void ezrtsp_queue_insert_tail(ezrtsp_queue_t * h, ezrtsp_queue_t * q)
 {
-	queue_t * last;
+	ezrtsp_queue_t * last;
 
 	last = h->prev;
 
@@ -143,7 +143,7 @@ void queue_insert_tail( queue_t * h, queue_t * q )
 	last->next = q;
 }
 
-void queue_remove( queue_t * q )
+void ezrtsp_queue_remove(ezrtsp_queue_t * q)
 {
 	if( q->prev ) {
 		q->prev->next = q->next;
@@ -155,42 +155,42 @@ void queue_remove( queue_t * q )
 	q->next = NULL;
 }
 
-int queue_empty( queue_t * h )
+int ezrtsp_queue_empty(ezrtsp_queue_t * h)
 {
 	return ( (h == h->prev) ? 1 : 0 );
 }
 
-queue_t * queue_head( queue_t * h )
+ezrtsp_queue_t * ezrtsp_queue_head(ezrtsp_queue_t * h)
 {
 	return h->next;
 }
 
-queue_t * queue_next( queue_t * q )
+ezrtsp_queue_t * ezrtsp_queue_next(ezrtsp_queue_t * q)
 {
 	return q->next;
 }
 
-queue_t * queue_prev( queue_t * q )
+ezrtsp_queue_t * ezrtsp_queue_prev(ezrtsp_queue_t * q)
 {
 	return q->prev;
 }
 
-queue_t * queue_tail( queue_t * h )
+ezrtsp_queue_t * ezrtsp_queue_tail(ezrtsp_queue_t * h)
 {
 	return h;
 }
 
 
 
-void sys_free( void * addr )
+void ezrtsp_free(void * addr)
 {
-    assert( addr );
+    assert(addr);
     pthread_mutex_lock(&g_alloc_lock);
     free(addr);
     pthread_mutex_unlock(&g_alloc_lock);
 }
 
-void * sys_alloc( int size )
+void * ezrtsp_alloc( int size )
 {
     assert( size > 0 );
     pthread_mutex_lock(&g_alloc_lock); /// lock for thread safe 
@@ -207,16 +207,16 @@ void * sys_alloc( int size )
 /// @brief absolutely msecond number since device startup
 /// @param
 /// @return
-unsigned long long sys_ts_msec(void)
+unsigned long long ezrtsp_ts_msec(void)
 {
 	struct timespec time;
 	clock_gettime(CLOCK_MONOTONIC, &time);
 	return ((time.tv_sec * 1000) + (time.tv_nsec/1000000));
 }
 
-int meta_alloc(meta_t ** meta, int size)
+int ezrtsp_meta_alloc(ezrtsp_meta_t ** meta, int size)
 {
-	meta_t * nmeta = sys_alloc(sizeof(meta_t) + size);
+	ezrtsp_meta_t * nmeta = ezrtsp_alloc(sizeof(ezrtsp_meta_t) + size);
 	if(!nmeta) {
 		err("meta alloc err\n");
 		return -1;
@@ -228,10 +228,10 @@ int meta_alloc(meta_t ** meta, int size)
 	return 0;
 }
 
-void meta_free(meta_t * meta)
+void ezrtsp_meta_free(ezrtsp_meta_t * meta)
 {
 	if(meta) {
-		sys_free(meta);
+		ezrtsp_free(meta);
 	}
 	return;
 }

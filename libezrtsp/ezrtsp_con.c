@@ -26,7 +26,7 @@ int ezrtsp_con_alloc(rtsp_con_t ** out)
 		if(c->fuse) continue;
 		
 		if(!c->meta) {
-			if(0 != meta_alloc(&c->meta, 4096)) {
+			if(0 != ezrtsp_meta_alloc(&c->meta, 4096)) {
 				err("meta alloc\n");
 				pthread_mutex_unlock(&con_lock);
 				return -1;

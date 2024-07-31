@@ -1,7 +1,7 @@
 #ifndef __EZCACHE_H__
 #define __EZCACHE_H__
 
-#include "common.h"
+#include "ezrtsp_common.h"
 
 enum {
     SYS_CACHE_VIDEO_MAIN = 0,
@@ -13,7 +13,7 @@ enum {
 
 typedef struct ezcache_frm_s
 {
-    queue_t             queue;
+    ezrtsp_queue_t   queue;
     long long  seq;
     unsigned long long  ts;
 

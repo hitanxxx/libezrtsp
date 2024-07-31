@@ -1,11 +1,11 @@
-#include "common.h"
+#include "ezrtsp_common.h"
 #include "event.h"
 
 ev_t * ev_find(ev_ctx_t * ctx, int fd)
 {
     ev_t * ev = NULL;
-    queue_t * q = queue_head(&ctx->queue);
-    for(; q != queue_tail(&ctx->queue); q = queue_next(q)) {
+    ezrtsp_queue_t * q = ezrtsp_queue_head(&ctx->queue);
+    for(; q != ezrtsp_queue_tail(&ctx->queue); q = ezrtsp_queue_next(q)) {
         ev = ptr_get_struct(q, ev_t, queue);
         if(ev->fd == fd) {
             return ev;
@@ -30,7 +30,7 @@ void ev_timer_add(ev_ctx_t * ctx, int fd, void * user_data, ev_exp_cb cb, int de
     if(ev) {
     	ev->ext_data = user_data;
 	    ev->exp_cb = cb;
-	    ev->exp_ts = sys_ts_msec()+delay_msec;
+	    ev->exp_ts = ezrtsp_ts_msec() + delay_msec;
     }
     return;
 }
@@ -70,7 +70,7 @@ void ev_opt(ev_ctx_t * ctx, int fd, void * user_data, ev_cb cb, int op)
         }
     } else {  /// ev_obj not find 
         if(op != EV_NONE) {
-            ev = sys_alloc(sizeof(ev_t));
+            ev = ezrtsp_alloc(sizeof(ev_t));
             if(!ev) {
                 err("ev alloc fialed. [%d] [%s]\n", errno, strerror(errno));
                 return;
@@ -81,7 +81,7 @@ void ev_opt(ev_ctx_t * ctx, int fd, void * user_data, ev_cb cb, int op)
             ev->exp_cb = NULL;
             ev->ext_data = user_data;
             ev->ctx = ctx;
-            queue_insert_tail(&ctx->queue, &ev->queue);
+            ezrtsp_queue_insert_tail(&ctx->queue, &ev->queue);
 	        ev->active = 1;
             if (op == EV_RW) {
                 FD_SET(fd, &ctx->cache_rfds);
@@ -106,7 +106,7 @@ void ev_loop(ev_ctx_t * ctx)
     */
     int max_fd = -1;
     int actall = 0;
-    unsigned long long cur_msec = sys_ts_msec();
+    unsigned long long cur_msec = ezrtsp_ts_msec();
 
     fd_set rfds;
     fd_set wfds;
@@ -117,14 +117,14 @@ void ev_loop(ev_ctx_t * ctx)
     ts.tv_usec = 15 * 1000;   ///timer degree : 15msecond
 
     ev_t * ev = NULL;
-    queue_t * q = queue_head(&ctx->queue);
-    queue_t * n = NULL;
-    while(q != queue_tail(&ctx->queue)) {
-        n = queue_next(q);    
+    ezrtsp_queue_t * q = ezrtsp_queue_head(&ctx->queue);
+    ezrtsp_queue_t * n = NULL;
+    while(q != ezrtsp_queue_tail(&ctx->queue)) {
+        n = ezrtsp_queue_next(q);    
         ev = ptr_get_struct(q, ev_t, queue);
         if(!ev->active) {
-            queue_remove(q);
-            sys_free(ev);
+            ezrtsp_queue_remove(q);
+            ezrtsp_free(ev);
         } else {
             if(ev->fd > max_fd) 
                 max_fd = ev->fd;
@@ -148,10 +148,10 @@ void ev_loop(ev_ctx_t * ctx)
 	    return;
     } else {
         int actn = 0;
-        queue_t * q = queue_head(&ctx->queue);
-        queue_t * n = NULL;
-        while(q != queue_tail(&ctx->queue)) {
-            n = queue_next(q);
+        ezrtsp_queue_t * q = ezrtsp_queue_head(&ctx->queue);
+        ezrtsp_queue_t * n = NULL;
+        while(q != ezrtsp_queue_tail(&ctx->queue)) {
+            n = ezrtsp_queue_next(q);
 
             ev_t * ev = ptr_get_struct(q, ev_t, queue);
             int rw = 0;
@@ -170,7 +170,7 @@ void ev_loop(ev_ctx_t * ctx)
 
 int ev_create(ev_ctx_t ** ctx)
 {
-    ev_ctx_t * nctx = sys_alloc(sizeof(ev_ctx_t));
+    ev_ctx_t * nctx = ezrtsp_alloc(sizeof(ev_ctx_t));
     if(!nctx) {
         err("ev ctx alloc failed. [%d]\n", errno );
         return -1;
@@ -178,7 +178,7 @@ int ev_create(ev_ctx_t ** ctx)
 
     FD_ZERO(&nctx->cache_rfds);
     FD_ZERO(&nctx->cache_wfds);
-    queue_init(&nctx->queue);
+    ezrtsp_queue_init(&nctx->queue);
     *ctx = nctx;
     return 0;
 }
@@ -188,7 +188,7 @@ void ev_free(ev_ctx_t * ctx)
     if(ctx) {
         FD_ZERO(&ctx->cache_rfds);
         FD_ZERO(&ctx->cache_wfds);
-        sys_free(ctx);
+        ezrtsp_free(ctx);
     }
 }
 

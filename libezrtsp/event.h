@@ -1,7 +1,7 @@
 #ifndef __EVENT_H__
 #define __EVENT_H__
 
-#include "common.h"
+#include "ezrtsp_common.h"
 
 /// evt datas 
 #define EV_FD_MAX  256
@@ -18,9 +18,8 @@ typedef void (*ev_cb) (ev_ctx_t * ctx, int fd, void * user_data, int rw);
 typedef void (*ev_exp_cb) (ev_ctx_t * ctx, int fd, void * user_data);
 
 /// @brief evt obj data
-struct ev_t
-{
-    queue_t     queue;
+struct ev_t {
+    ezrtsp_queue_t     queue;
     ev_ctx_t *  ctx;
     ev_cb       cb;
     int         fd;
@@ -34,11 +33,10 @@ struct ev_t
 };
 
 /// @brief evt mgr datas
-struct ev_ctx_t
-{
+struct ev_ctx_t {
     fd_set cache_rfds;
     fd_set cache_wfds;
-    queue_t queue;
+    ezrtsp_queue_t queue;
 };
 
 /// evt api

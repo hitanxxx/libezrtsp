@@ -1,7 +1,20 @@
 #ifndef __EZRTSP_UTILS_H__
 #define __EZRTSP_UTILS_H__
 
-#include "common.h"
+#ifndef AT_G711A 
+#define AT_G711A 1
+#endif
+#ifndef AT_AAC
+#define AT_AAC 3
+#endif
+
+#ifndef VT_H264
+#define VT_H264 0
+#endif
+#ifndef VT_H265
+#define VT_H265 1
+#endif
+
 
 #define EZRTSP_CON_MAX	2
 #define EZRTSP_PORT     554 

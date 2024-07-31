@@ -7,9 +7,9 @@ static unsigned char audio_adts_hdr[4] = {0};
 
 typedef struct {
     int cfg;
-    sys_data_t * vps;
-    sys_data_t * sps;
-    sys_data_t * pps; 
+    ezrtsp_data_t * vps;
+    ezrtsp_data_t * sps;
+    ezrtsp_data_t * pps; 
 } video_cfg_t;
 static video_cfg_t video_cfg[2] = {0};
 static ezrtsp_ctx_t g_ctx = {0};
@@ -24,7 +24,7 @@ int ezrtsp_video_codec_typ()
     return g_ctx.vtype;
 }
 
-int ezrtsp_video_sequence_parament_set_get(int ch, sys_data_t ** vps, sys_data_t ** sps, sys_data_t ** pps)
+int ezrtsp_video_sequence_parament_set_get(int ch, ezrtsp_data_t ** vps, ezrtsp_data_t ** sps, ezrtsp_data_t ** pps)
 {
     if(vps) *vps = video_cfg[ch].vps;
     if(sps) *sps = video_cfg[ch].sps;
@@ -32,9 +32,9 @@ int ezrtsp_video_sequence_parament_set_get(int ch, sys_data_t ** vps, sys_data_t
     return 0;
 }
 
-static int ezrtsp_video_sequence_parament_set_save(unsigned char * data, int datan, sys_data_t ** sys)
+static int ezrtsp_video_sequence_parament_set_save(unsigned char * data, int datan, ezrtsp_data_t ** sys)
 {
-    sys_data_t * t = sys_alloc(sizeof(sys_data_t) + datan);
+    ezrtsp_data_t * t = ezrtsp_alloc(sizeof(ezrtsp_data_t) + datan);
     if(!t) {
         err("sys data alloc err\n");
         return -1;
@@ -64,7 +64,7 @@ static int ezrtsp_video_sequence_parament_set_proc(int ch, unsigned char * nalu,
         if(video_cfg[ch].sps && video_cfg[ch].pps) {
             video_cfg[ch].cfg = 1;
         }
-        ezcache_frm_add(ch, nalu, nalun, nalu_type == 5 ? 1 : 2, sys_ts_msec(), fin);
+        ezcache_frm_add(ch, nalu, nalun, nalu_type == 5 ? 1 : 2, ezrtsp_ts_msec(), fin);
 
     } else {
         int nalu_type = (nalu[0] & 0b01111110) >> 1;
@@ -84,7 +84,7 @@ static int ezrtsp_video_sequence_parament_set_proc(int ch, unsigned char * nalu,
         if(video_cfg[ch].vps && video_cfg[ch].sps && video_cfg[ch].pps) {
             video_cfg[ch].cfg = 1;
         }
-        ezcache_frm_add(ch, nalu, nalun, (nalu_type == 19 || nalu_type == 20) ? 1 : 2, sys_ts_msec(), fin);
+        ezcache_frm_add(ch, nalu, nalun, (nalu_type == 19 || nalu_type == 20) ? 1 : 2, ezrtsp_ts_msec(), fin);
     }
     return 0;
 }
@@ -115,7 +115,7 @@ static int ezrtsp_audio_aacadts_proc(unsigned char * data, int datan)
     return 0;
 }
 
-unsigned char * ezrtso_audio_aadadts_get()
+unsigned char * ezrtsp_audio_aacadts_get()
 {
     return audio_adts_hdr;
 }
@@ -126,8 +126,9 @@ int ezrtsp_push_afrm(unsigned char *data, int datan)
         ezrtsp_audio_aacadts_proc(data, datan);
         faudio_cfg = 1;
     }
-    unsigned long long ts_now = sys_ts_msec();
-    ezcache_frm_add(0, data, datan, 0, ts_now ,0);
+    unsigned long long ts_now = ezrtsp_ts_msec();
+    ezcache_frm_add(0, data, datan, 0, ts_now ,0);  ///push audio data into channel 0
+    ezcache_frm_add(1, data, datan, 0, ts_now ,0);  ///push audio data into channel 1
     return 0;
 }
 
@@ -174,5 +175,8 @@ int ezrtsp_start(ezrtsp_ctx_t * ctx)
 
 int ezrtsp_stop()
 {
-    return ezrtsp_serv_stop();
+    ezrtsp_serv_stop();
+    ezcache_exit(0);
+    ezcache_exit(1);
+    return 0;
 }

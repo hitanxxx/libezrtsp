@@ -55,7 +55,7 @@ void ezrtsp_rsp_send(ev_ctx_t * ctx, int fd, void * user_data, int op)
     ev_timer_del(ctx, fd);
     ///dbg("ezrtsp [%p:%d] rsp send:%s\n", c, c->fd, c->meta->start);
     dbg("========>\n");
-    printf("%s\n", c->meta->start);
+    dbg("%s\n", c->meta->start);
     meta_clr(c->meta);
 
     c->methodn = 0;
@@ -96,20 +96,20 @@ static int ezrtsp_options(rtsp_con_t   * c)
 static int ezrtsp_describe_video_sdp(int chn, char * str)
 {
     char vpsb64[128] = {0}, spsb64[512] = {0}, ppsb64[128] = {0};
-    sys_data_t * vps = NULL;
-    sys_data_t * sps = NULL;
-    sys_data_t * pps = NULL;
+    ezrtsp_data_t * vps = NULL;
+    ezrtsp_data_t * sps = NULL;
+    ezrtsp_data_t * pps = NULL;
     ezrtsp_video_sequence_parament_set_get(chn, &vps, &sps, &pps);
 
     if(ezrtsp_video_codec_typ() == VT_H264) { 
         int level = (sps->data[1]<<16) | (sps->data[2]<<8)|sps->data[3];
-        sys_base64_encode((char*)sps->data, sps->datan, spsb64, sizeof(spsb64));
-        sys_base64_encode((char*)pps->data, pps->datan, ppsb64, sizeof(ppsb64));
+        ezrtsp_base64_encode((char*)sps->data, sps->datan, spsb64, sizeof(spsb64));
+        ezrtsp_base64_encode((char*)pps->data, pps->datan, ppsb64, sizeof(ppsb64));
         sprintf(str, "profile-level-id=%06X;sprop-parameter-sets=%s,%s", level, spsb64, ppsb64);
     } else {
-        sys_base64_encode((char*)vps->data, vps->datan, vpsb64, sizeof(vpsb64));
-        sys_base64_encode((char*)pps->data, pps->datan, ppsb64, sizeof(ppsb64));
-        sys_base64_encode((char*)sps->data, sps->datan, spsb64, sizeof(spsb64));
+        ezrtsp_base64_encode((char*)vps->data, vps->datan, vpsb64, sizeof(vpsb64));
+        ezrtsp_base64_encode((char*)pps->data, pps->datan, ppsb64, sizeof(ppsb64));
+        ezrtsp_base64_encode((char*)sps->data, sps->datan, spsb64, sizeof(spsb64));
         sprintf(str, "sprop-vps=%s;sprop-sps=%s;sprop-pps=%s", vpsb64, spsb64, ppsb64);
     }
     return 0;
@@ -151,7 +151,7 @@ static int ezrtsp_describe_audio_sdp(char * str)
         );
         #else
         char config[32] = {0};
-		unsigned char * adts_header = ezrtso_audio_aadadts_get();
+		unsigned char * adts_header = ezrtsp_audio_aacadts_get();
         unsigned char profile = (adts_header[2]&0xc0)>>6;
         unsigned char freq = (adts_header[2]&0x3c)>>2;
         unsigned char channel = ((adts_header[2]&0x1)<<2)|((adts_header[3]&0xc0)>>6);
@@ -407,7 +407,7 @@ static void ezrtsp_req(ev_ctx_t * ctx, int fd, void * user_data, int op)
     ev_timer_del(ctx, fd);
     ////dbg("ezrtsp request:%s\n", c->meta->pos);
     dbg("<========\n");
-    printf("%s\n", c->meta->pos);
+    dbg("%s\n", c->meta->pos);
 
     p = strstr(c->meta->pos, "CSeq:");
     if(!p) {
@@ -539,7 +539,7 @@ static void * ezrtsp_serv_task(void * para)
 {
     ev_ctx_t * ctx = NULL;
 
-    SET_THREAD_NAME("ezrtsp");
+    EZRTSP_THNAME("ezrtsp");
     if(0 != ev_create(&ctx)) {
         err("ezrtsp ctx create err\n");
         return NULL;

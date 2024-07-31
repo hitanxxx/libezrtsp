@@ -1,7 +1,7 @@
 #ifndef __EZRTSP_H__
 #define __EZRTSP_H__
 
-#include "common.h"
+#include "ezrtsp_common.h"
 #include "event.h"
 
 #define METHOD_OPTIONS      1
@@ -69,7 +69,7 @@ struct rtsp_con {
     ev_ctx_t * ctx;
 
     char client_ip[64];
-    meta_t * meta;
+    ezrtsp_meta_t * meta;
 
     int state;
     char * method;
@@ -116,12 +116,12 @@ int ezrtcp_sr_send(rtsp_con_t *c);
 
 int ezrtsp_video_codec_typ();
 int ezrtsp_video_sequence_parament_set_ready(int ch);
-int ezrtsp_video_sequence_parament_set_get(int ch, sys_data_t ** vps, sys_data_t ** sps, sys_data_t ** pps);
+int ezrtsp_video_sequence_parament_set_get(int ch, ezrtsp_data_t ** vps, ezrtsp_data_t ** sps, ezrtsp_data_t ** pps);
 
 int ezrtsp_audio_codec_typ();
 int ezrtsp_audio_enb();
 int ezrtsp_audio_aacadts_ready();
-unsigned char * ezrtso_audio_aadadts_get();
+unsigned char * ezrtsp_audio_aacadts_get();
 
 
 #endif

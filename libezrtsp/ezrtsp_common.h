@@ -81,6 +81,10 @@
 #define UNLIKELY(x)     __builtin_expect(!!(x), 0)
 #endif
 
+#ifndef schk
+#define schk(x, action)     if(UNLIKELY(!(x))) {err("schk err: %s\n", #x); action;}
+#endif
+
 #ifndef err
 #define err(format, ...) \
 do { \
@@ -108,7 +112,7 @@ do { \
 #endif
 
 #ifndef SYS_ABS
-#define SYS_ABS(a) ( ((a)>=0)?(a):(0-(a)) )
+#define SYS_ABS(a) (((a)>=0)?(a):(0-(a)))
 #endif
 
 #ifndef SYS_MAX
@@ -136,7 +140,6 @@ do { \
 #define __packed  __attribute__((packed))
 #endif
 
-
 typedef struct queue_s ezrtsp_queue_t;
 struct queue_s {
     ezrtsp_queue_t  *prev;
@@ -145,17 +148,17 @@ struct queue_s {
 
 typedef struct ezrtsp_meta_t ezrtsp_meta_t;
 struct ezrtsp_meta_t {
-	ezrtsp_meta_t * next;
-	char * start;
-	char * end;
-	char * pos;
-	char * last;
-	char data[0];
+    ezrtsp_meta_t * next;
+    char * start;
+    char * end;
+    char * pos;
+    char * last;
+    char data[0];
 };
 
 typedef struct ezrtsp_data {
-	int datan;
-	unsigned char data[0];
+    int datan;
+    unsigned char data[0];
 } ezrtsp_data_t;
 
 #ifndef meta_getfree
@@ -173,17 +176,18 @@ typedef struct ezrtsp_data {
 #ifndef meta_clr
 #define meta_clr(x) \
 do { \
-	(x)->pos = (x)->last = (x)->start; \
-	memset(x->start, 0x0, meta_cap(x)); \
+    (x)->pos = (x)->last = (x)->start; \
+    memset(x->start, 0x0, meta_cap(x)); \
 } while(0); 
 #endif
+
 
 int ezrtsp_base64_encode(const char *in, int inlen, char *out, int outlen);
 int ezrtsp_base64_decode(const char *in, int inlen, char *out, int outlen);
 
 // common function
-void ezrtsp_free(void * addr);
-void * ezrtsp_alloc(int size);
+void ez_free(void * addr);
+void * ez_alloc(int size);
 unsigned long long ezrtsp_ts_msec(void);
 
 void ezrtsp_queue_init(ezrtsp_queue_t * q);
@@ -196,6 +200,8 @@ ezrtsp_queue_t * ezrtsp_queue_next(ezrtsp_queue_t * q);
 ezrtsp_queue_t * ezrtsp_queue_prev(ezrtsp_queue_t * q);
 ezrtsp_queue_t * ezrtsp_queue_tail(ezrtsp_queue_t * h);
 
+int ezrtsp_meta_pdata(ezrtsp_meta_t *meta, void *data, int datan);
+int ezrtsp_meta_pnum(ezrtsp_meta_t *meta, char num);
 int ezrtsp_meta_alloc(ezrtsp_meta_t ** meta, int size);
 void ezrtsp_meta_free(ezrtsp_meta_t * meta);
 

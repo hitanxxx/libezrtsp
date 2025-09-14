@@ -17,7 +17,7 @@
 
 
 #define EZRTSP_CON_MAX	2
-#define EZRTSP_PORT     554 
+#define EZRTSP_PORT     554
 #define EZRTSP_MSS      1430
 
 #define EZRTSP_URI_MAIN      "/main_ch"
@@ -30,8 +30,8 @@ typedef struct {
 } ezrtsp_ctx_t;
 
 int ezrtsp_start(ezrtsp_ctx_t * ctx);
-int ezrtsp_stop();
+int ezrtsp_stop(void);
 int ezrtsp_push_afrm(unsigned char * data, int datan);
-int ezrtsp_push_vfrm(int ch, unsigned char * data, int datan);
+int ezrtsp_push_vfrm(int ch, unsigned char *data, int datan, int typ);   /// 0:audio  1:iframe  2:pframe or bframe 
 
 #endif

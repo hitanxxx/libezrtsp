@@ -2,7 +2,7 @@
 #define __EZRTSP_H__
 
 #include "ezrtsp_common.h"
-#include "event.h"
+#include "ezevt.h"
 
 #define METHOD_OPTIONS      1
 #define METHOD_DESCRIBE     2
@@ -60,33 +60,32 @@ typedef struct {
 
 /// @brief rtsp connection info
 struct rtsp_con {
-    int fd;
+    ev_t *evt;
+    ev_ctx_t *ev_ctx;
+    
     int rtp_port_audio;
     int rtp_port_video;
     int rtcp_port_audio;
     int rtcp_port_video;
 
-    ev_ctx_t * ctx;
-
     char client_ip[64];
-    ezrtsp_meta_t * meta;
+    ezrtsp_meta_t *meta;
 
     int state;
-    char * method;
+    char *method;
     int methodn;
-    char * url;
+    char *url;
     int urln;
-	char * reqfin;
+    char *reqfin;
    
-    char fuse:1;
-    char fplay:1;
+    char fuse:1;        ///
     char fcomplete:1;
+    char fplay:1;
     char fovertcp:1;
     char faudioenb:1;
     char fvideoenb:1;
-    char fidr:1;
     
-	long long ichseq;
+    long long ichseq;
     int ichn;
     int icseq;
     int imethod;
@@ -102,13 +101,13 @@ struct rtsp_con {
     int rtp_stat;
 };
 
-int ezrtsp_serv_start();
-int ezrtsp_serv_stop();
+int ezrtsp_serv_start(void);
+int ezrtsp_serv_stop(void);
 
 int ezrtsp_con_init();
 int ezrtsp_con_alloc(rtsp_con_t ** c);
 void ezrtsp_con_free(rtsp_con_t * c);
-void ezrtsp_con_expire(ev_ctx_t * ctx, int fd, void * user_data);
+void ezrtsp_con_expire(ev_ctx_t * ctx, ev_t *evt);
 
 int ezrtp_start(rtsp_con_t * c);
 int ezrtp_packet_send(int fd, char * data, int datan);

@@ -61,147 +61,103 @@
 
 #include "ezrtsp_utils.h"
 
-typedef struct ffctx ffctx_t;
-typedef void (*ff_cb) (ffctx_t * ctx, unsigned char * data, int datan);
-struct ffctx {
-    ff_cb cb;
-    char fname[256];
-    int ffd;
-    int fps;
-    int h265;
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 
-    char buf[2*1024*1024];
-    char * start;
-    char * end;
-    char * pos;
-    char * last;
-};
+static char fquit = 0;
 
-void ffnalu_video(ffctx_t * ctx, unsigned char *data, int datan)
-{
-    if(ctx->h265) {
-        ezrtsp_push_vfrm(0, (char*)data, datan);
-    } else {
-        ///int nalu_type = data[0] & 0b00011111;
-        ///dbg("H264. naltype [%d] <%p:%d>\n", nalu_type, data, datan);
-        ezrtsp_push_vfrm(0, (char*)data, datan);
+void signal_cb(int signal) {
+    int err_cc = errno; ///cache errno 
+
+    if (signal == SIGINT) {
+        fquit = 1;
     }
-    return;
+    
+    errno = err_cc; ///recovery errno
 }
 
-int ffnalu_alloc(ffctx_t ** ctx, char * fname, ff_cb cb, int fps, int h265)
-{
-    int ret = -1;
-    ffctx_t * nctx = NULL;
-    do {
-        nctx = malloc(sizeof(ffctx_t));
-            if(!nctx) {
-            printf("alloc ffctx err\n");
-            break;
-        }
-        memset(nctx, 0, sizeof(ffctx_t));
-        nctx->start = nctx->buf;
-        nctx->end = nctx->start + sizeof(nctx->buf);
-        nctx->pos = nctx->last = nctx->start;
-        nctx->cb = cb;
-        nctx->fps = fps;
-        nctx->h265 = h265;
-        memcpy(nctx->fname, fname, strlen(fname));
-        nctx->ffd = open(nctx->fname, O_RDONLY);
-        if(0 > nctx->ffd) {
-            printf("open ffctx file err. [%d:%s]\n", errno, strerror(errno));
-            break;
-        }
-        ret = 0;
-    } while(0);
-
-    if(ret != 0) {
-        if(nctx) free(nctx);
-        return -1;
-    }
-    *ctx = nctx;
-    return 0;
-}
-
-int ffnalu_free(ffctx_t * ctx)
-{
-    if(ctx) {
-        if(ctx->ffd) {
-            close(ctx->ffd);
-            ctx->ffd = 0;
-        }
-        free(ctx);
-    }
-    return 0;
-}
-
-int ffnalu_process(ffctx_t * ctx)
-{
-    int readn = 0;
-    for(;;) {
-        if(ctx->end > ctx->last) {
-            readn = read(ctx->ffd, ctx->last, ctx->end - ctx->last);
-            if(readn <= 0) {
-                if(readn == 0) {
-                    ///eof. 
-                    lseek(ctx->ffd, 0L, SEEK_SET);
-                    ctx->pos = ctx->last = ctx->start;
-                    continue;
-                }
-                printf("ff read err. [%d:%s]\n", errno, strerror(errno));
-                return -1;
-            }
-            ctx->last += readn;
-        }
-
-        char * nalus = NULL;
-        char find = 0;
-        for(; ctx->last > ctx->pos; ctx->pos++) {
-            char * p = ctx->pos;
-            if(((ctx->last - ctx->pos) > 3) && p[0] == 0x00 && p[1] == 0x00 && p[2] == 0x01) {
-                find = 1;
-                ctx->pos += 3;
-            }
-            if(((ctx->last - ctx->pos) > 4) && p[0] == 0x00 && p[1] == 0x00 && p[2] == 0x00 && p[3] == 0x01) {
-                find = 1;
-                ctx->pos += 4;
-            }
-
-            if(find > 0) {
-                if(!nalus) {
-                    nalus = p;
-                } else {
-                    ctx->cb(ctx, (unsigned char*)nalus, p - nalus);
-                    usleep((1000/ctx->fps)*1000);
-                    nalus = p;
-                }
-                find = 0;
-            }
+int signal_init(void) {
+    int i = 0;
+    struct sigaction sa;
+    int arr[] = {
+        SIGINT,
+        SIGPIPE,
+        0
+    };
+    for (i = 0; arr[i]; i++) {
+        memset(&sa, 0x0, sizeof(struct sigaction));
+        sigemptyset(&sa.sa_mask);
+        sa.sa_handler = signal_cb;
+        sa.sa_flags = SA_SIGINFO;
+        if (0 != sigaction(arr[i], &sa, NULL)) {
+            return -1;
         }
     }
     return 0;
 }
 
-int main(int argc, char ** argv)
-{
-    if(argc < 2) {
-        printf("need to specify a file\n");
+int main(int argc, char **argv) {
+
+    ezrtsp_ctx_t ctx = {
+        .vtype = VT_H264,
+        .aenb = 0
+    };
+    ezrtsp_start(&ctx);
+
+#if 1
+    /// cut h264 file frame by frame 
+#if LIBAVCODEC_VERSION_INT < AV_VERSION_INT(58, 9, 100)
+    av_register_all();
+#endif
+    
+    AVFormatContext *ff_format_ctx = NULL;
+    AVPacket *pkt = NULL;
+    
+    if (avformat_open_input(&ff_format_ctx, "./venc_br1_1024kbps_chn0_2560x1440.h264", NULL, NULL) != 0) {
+        printf("ff input file open err\n");
         return -1;
     }
-    
-    ezrtsp_ctx_t rtspctx;
-    rtspctx.vtype = VT_H264;
-    rtspctx.aenb = 0;
-    ezrtsp_start(&rtspctx);
-    
-    ffctx_t * ctx = NULL;
-    if(0 != ffnalu_alloc(&ctx, argv[1], ffnalu_video, 15, 0)) {
-        printf("ffnalu ctx alloc err\n");
+    if (avformat_find_stream_info(ff_format_ctx, NULL) < 0) {
+        printf("ff input file get stream info err\n");
+        avformat_close_input(&ff_format_ctx);
         return -1;
     }
-    ffnalu_process(ctx);
-    ffnalu_free(ctx);
+    pkt = av_packet_alloc();
+    if (!pkt) {
+        printf("ff pkt alloc err\n");
+        avformat_close_input(&ff_format_ctx);
+        return -1;
+    }
+    while (!fquit) {
+        int ret = av_read_frame(ff_format_ctx, pkt);
+        if (ret < 0) {
+            printf("reset stream\n");
+            ret = av_seek_frame(ff_format_ctx, 0, 0, AVSEEK_FLAG_BYTE);  ///AVSEEK_FLAG_BACKWARD 
+            if (ret < 0) {
+                printf("stream seek to start err [%s]\n", av_err2str(ret));
+                break;
+            }
+        } else {
+            ///printf("frame data len [%d] stream idx [%d] key frame [%s]\n",
+            ///    pkt->size,
+            ///    pkt->stream_index,
+            ///    pkt->flags == AV_PKT_FLAG_KEY ? "yes" : "no"
+            ///);
+            ezrtsp_push_vfrm(0, pkt->data, pkt->size, pkt->flags == AV_PKT_FLAG_KEY ? 1 : 2);
+            ezrtsp_push_vfrm(1, pkt->data, pkt->size, pkt->flags == AV_PKT_FLAG_KEY ? 1 : 2);
+        }
+        
+        av_packet_unref(pkt);
+        usleep((1000/15)*1000);
+    }
+    av_packet_free(&pkt);
+    avformat_close_input(&ff_format_ctx);
+#else
+    while(!fquit) {
+        sleep(1);
+    }
+#endif
     
-	ezrtsp_stop();
+    ezrtsp_stop();
     return 0;
 }

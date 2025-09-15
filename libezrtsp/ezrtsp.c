@@ -45,7 +45,6 @@ void ezrtsp_rsp_send(ev_ctx_t *ev_ctx, ev_t *evt) {
         if (sendn < 0) {
             if((errno == EAGAIN) || (errno == EWOULDBLOCK)) {
                 return ev_timer_add(ev_ctx, evt, ezrtsp_con_expire, 5000);
-
             }
             err("ezrtsp [%p:%d] send rsp err. [%d]\n", rtspc, evt->fd, errno);
             return ezrtsp_con_free(rtspc);
@@ -118,8 +117,7 @@ static int ezrtsp_describe_video_sdp(int chn, char *str) {
     return 0;
 }
 
-static int ezrtsp_describe_audio_sdp(char * str)
-{
+static int ezrtsp_describe_audio_sdp(char * str) {
     if (ezrtsp_audio_codec_typ() == AT_AAC) {
         #if(0)  ///if have't adts header, mabey need this
         int aac_samplerate = 8000;
@@ -243,8 +241,7 @@ static int ezrtsp_describe(rtsp_con_t *rtspc) {
     return 0;
 }
 
-static int ezrtsp_setup_udp_connection(int * fd, int localport, char * cli_ip, int cli_port)
-{
+static int ezrtsp_setup_udp_connection(int * fd, int localport, char * cli_ip, int cli_port) {
     int ffd = 0;
 
     int socklen = sizeof(struct sockaddr_in);

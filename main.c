@@ -70,6 +70,7 @@ void signal_cb(int signal) {
     int err_cc = errno; ///cache errno 
 
     if (signal == SIGINT) {
+	printf("exiting. please wait\n");
         fquit = 1;
     }
     
@@ -97,6 +98,7 @@ int signal_init(void) {
 }
 
 int main(int argc, char **argv) {
+    signal_init();
 
     ezrtsp_ctx_t ctx = {
         .vtype = VT_H264,
@@ -159,5 +161,6 @@ int main(int argc, char **argv) {
 #endif
     
     ezrtsp_stop();
+    printf("exited\n");
     return 0;
 }

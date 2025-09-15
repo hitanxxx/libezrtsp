@@ -487,6 +487,8 @@ static void * ezrtp_task(void *param) {
             ts_catch = ts_now;
 
         if (ts_now - ts_catch > 500) {
+	    ts_catch = ts_now;
+
             long long last_seq = ezcache_seq_last(rtspc->ichn);
             long long limit = 25;
             long long delta = last_seq - rtspc->ichseq;
